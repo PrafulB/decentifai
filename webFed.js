@@ -147,7 +147,7 @@ export class WebFed {
      * @returns {Function} - Parameter extraction function
      */
     async _getDefaultExtractFunction(backend) {
-        const { extractLocalParameters } = await import('/utils/extractors.js')
+        const { extractLocalParameters } = await import('https://prafulb.github.io/webFed/utils/extractors.js')
         return extractLocalParameters(backend)
     }
 
@@ -158,7 +158,7 @@ export class WebFed {
      * @returns {Function} - Parameter update function
      */
     async _getDefaultUpdateFunction(backend) {
-        const { updateLocalParameters } = await import('/utils/updators.js')
+        const { updateLocalParameters } = await import('https://prafulb.github.io/webFed/utils/updators.js')
         return updateLocalParameters(backend)
     }
 
@@ -168,7 +168,7 @@ export class WebFed {
      * @returns {Function} - Parameter aggregation function
      */
     async _getAggregator(aggregationMethod) {
-        const aggregators = await import('/utils/aggregators.js')
+        const aggregators = await import('https://prafulb.github.io/webFed/utils/aggregators.js')
         return aggregators[aggregationMethod]
     }
 
