@@ -268,6 +268,7 @@ export class WebFed {
                     lastSeen: Date.now(),
                     metadata: state
                 }
+                this._dispatchEvent('peersAdded', { peers: Object.keys(this.peers) })
                 this.log(`New peer ${state.metadata?.name} connected via awareness: ${clientID}`)
             }
         })
@@ -281,6 +282,7 @@ export class WebFed {
                     peer.metadata = state.metadata
                     this.peers[clientID] = peer
                 }
+                this._dispatchEvent('peersChanged', { peers: Object.keys(this.peers) })
                 this.log(`Peer ${state.metadata?.name} updated via awareness.`)
             }
         })
@@ -290,10 +292,10 @@ export class WebFed {
                 const peer = this.peers[clientID]
                 this.log(`Peer ${peer.metadata?.name} disconnected via awareness: ${clientID}`)
                 delete this.peers[clientID]
+                this._dispatchEvent('peersRemoved', { peers: Object.keys(this.peers) })
             }
         })
 
-        this._dispatchEvent('peersChanged', { peers: Object.keys(this.peers) })
         this._checkTrainingStatus()
     }
 
@@ -338,7 +340,7 @@ export class WebFed {
                 if (roundData.status === 'training') {
                     this._startTrainingRound()
                 }
-                else if (roundData.initiator!== this.getSelfPeerId() && roundData.status === 'completed') {
+                else if (roundData.status === 'completed') {
                     this.finalizeRound()
                 }
             }
@@ -978,7 +980,7 @@ export class WebFed {
             await this.model.updateLocalParametersFunc(this.model, aggregatedParams)
         
             const currentRoundData = this.roundInfo.get('roundData')
-            if (currentRoundData.currentRound !== this.trainingRound || currentRoundData.status !== 'completed') {   
+            if (currentRoundData.initiator === this.getSelfPeerId()) {   
                 this.roundInfo.set('roundData', {
                     ...this.roundInfo.get('roundData'),
                     currentRound: this.trainingRound,
