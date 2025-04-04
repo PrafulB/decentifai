@@ -8,33 +8,33 @@ export const updateLocalParameters = (backend) => {
     throw new Error(`Unsupported backend: ${backend}`);
 }
 
-const updateLocalTFJSModelParameters = (model, parameters) => {
-            const layers = model.layers || [];
-            const newWeights = [];
+const updateLocalTFJSModelParameters = async (model, parameters) => {
+    const { tensor } = await import('https://esm.sh/@tensorflow/tfjs');
+    const layers = model.layers || [];
+    const newWeights = [];
 
-            for (const layer of layers) {
-                const layerName = layer.name;
-                const layerParams = parameters[layerName];
+    for (const layer of layers) {
+        const layerName = layer.name;
+        const layerParams = parameters[layerName];
 
-                if (!layerParams || !layerParams.length) {
-                    continue;
-                }
+        if (!layerParams || !layerParams.length) {
+            continue;
+        }
 
-                // Convert parameters back to tensors
-                for (const param of layerParams) {
-                    const { values, shape } = param;
+        // Convert parameters back to tensors
+        for (const param of layerParams) {
+            const { values, shape } = param;
+            const tensor = tensor(values, shape);
+            newWeights.push(tensor);
+        }
+    }
 
-                    const tensor = tf.tensor(values, shape);
-                    newWeights.push(tensor);
-                }
-            }
+    // Update model weights if we have any
+    if (newWeights.length > 0) {
+        model.setWeights(newWeights);
+    }
 
-            // Update model weights if we have any
-            if (newWeights.length > 0) {
-                model.setWeights(newWeights);
-            }
-
-            return true;
+    return true;
 }
 
 const updateLocalONNXModelParameters = (model, parameters) => {
