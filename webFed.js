@@ -736,7 +736,6 @@ export class WebFed {
             status: 'training',
             startTime: Date.now()
         })
-        this._dispatchEvent('roundStarted', { round: this.trainingRound })
         return await this._startTrainingRound()
     }
 
