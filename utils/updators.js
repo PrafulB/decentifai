@@ -25,7 +25,7 @@ const updateLocalTFJSModelParameters = async (model, parameters) => {
         for (const param of layerParams) {
             const { values, shape } = param;
             const weightsTensor = tensor(values, shape);
-            newWeights.push(tensor);
+            newWeights.push(weightsTensor);
         }
     }
 
