@@ -1,3 +1,3 @@
-import { Decentifai } from "./decentifai.js"
+import { Decentifai } from "src/decentifai.js"
 
 export { Decentifai }
