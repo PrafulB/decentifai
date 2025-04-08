@@ -1,2 +1,2 @@
-# webFed
-P2P Decentralized learning using the Y.js CRDT and WebRTC!
+# DecentiFAI
+Decentralization in Federated AI modeling using the Y.js CRDT and WebRTC!
