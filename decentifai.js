@@ -1,5 +1,13 @@
 import { Doc, WebrtcProvider, awarenessProtocol } from "https://prafulb.github.io/bundledYjs/dist/yjs-bundle.esm.js"
 
+const DEFAULT_TURN_SERVER_FOR_ICE = {
+    urls: "turn:turn.speed.cloudflare.com:50000",
+    username:
+        "8b12fcfd4a40cc6fa9204b4ad0aaed9cd0e16d259cda6fe82ed832991c71090cc54d27b5581a0d5b2bbc3229a735adbc739b474858957ac53b4378cfb350eafd",
+    credential:
+        "aba9b169546eb6dcc7bfb1cdf34544cf95b5161d602e3b5fa7c8342b2e9802fb"
+}
+
 export class Decentifai {
     /**
      * Create a new Decentifai instance, a single entity to manage all P2P connections and learning.
@@ -29,6 +37,7 @@ export class Decentifai {
      * @param {boolean} options.autoTrain - Whether to automatically manage training rounds
      * @param {Array} options.signaling - Array of signaling server URLs
      * @param {Object} options.metadata - Additional metadata about this peer
+     * @param {boolean} options.forceTURNForICE - Forcibly use a TURN server for ICE candidate gathering. Fallback for if WebRTC connections cannot be established over the normal route (using STUN servers).
      * @param {boolean} options.debug - Enable debug logging
      */
     constructor(options) {
@@ -56,6 +65,7 @@ export class Decentifai {
                 waitTime: 2000,
                 ...options.federationOptions
             },
+            forceTURNForICE: false
         }
 
         if (!this.options.model) {
@@ -67,7 +77,7 @@ export class Decentifai {
         }
 
         this.onDeviceTraining = this.options.backend !== 'server'
-        
+
         this.model = this.options.model
         // Set up default parameter functions based on backend
         if (!this.model.train || typeof (this.model.train) !== 'function') {
@@ -201,13 +211,26 @@ export class Decentifai {
      */
 
     _setupWebRTC() {
-
-        this.provider = new WebrtcProvider(this.options.roomId, this.ydoc, {
+        const webrtcProviderOptions = {
             signaling: this.options.signaling,
             password: this.options.password,
             awareness: new awarenessProtocol.Awareness(this.ydoc),
             maxConns: 20
-        })
+        }
+
+        if (this.options.forceTURNForICE) {
+            webrtcProviderOptions.peerOpts = {
+                config: [{
+                    urls: "turn:turn.speed.cloudflare.com:50000",
+                    username:
+                      "8b12fcfd4a40cc6fa9204b4ad0aaed9cd0e16d259cda6fe82ed832991c71090cc54d27b5581a0d5b2bbc3229a735adbc739b474858957ac53b4378cfb350eafd",
+                    credential:
+                      "aba9b169546eb6dcc7bfb1cdf34544cf95b5161d602e3b5fa7c8342b2e9802fb"
+                  }]
+            }
+        }
+        
+        this.provider = new WebrtcProvider(this.options.roomId, this.ydoc, webrtcProviderOptions)
 
         this.awareness = this.provider.awareness
 
@@ -344,7 +367,7 @@ export class Decentifai {
                     this.finalizeRound()
                 }
             }
-    
+
             if (roundData?.currentRound > this.trainingRound) {
                 if (roundData.status === 'proposed') {
                     // Check if this peer is really behind in the federation. Forcibly update it to the latest aggregated parameter set if so.
@@ -354,7 +377,7 @@ export class Decentifai {
                         this.model.updateLocalParametersFunc(aggregatedParams)
                     }
                     this.trainingRound = roundData.currentRound
-    
+
                     // Acknowledge the round proposal via awareness
                     const awareness = this.awareness.getLocalState() || {}
                     awareness.round = this.trainingRound
@@ -362,7 +385,7 @@ export class Decentifai {
                     this.awareness.setLocalState(awareness)
                 }
             }
-            
+
             this._dispatchEvent('roundChanged', { round: this.trainingRound })
         }
     }
@@ -487,12 +510,13 @@ export class Decentifai {
                 }
                 await new Promise(res => {
                     const checkIfEnoughParametersShared = setInterval(() => {
-                    const numPeersWhoSharedParameters = this.getNumPeersWhoSharedParameters()
-                    if (numPeersWhoSharedParameters + 1 >= this.options.federationOptions.minPeers) {
-                        clearInterval(checkIfEnoughParametersShared)
-                        res(true)
-                    }
-                }, this.options.federationOptions.waitTime)})
+                        const numPeersWhoSharedParameters = this.getNumPeersWhoSharedParameters()
+                        if (numPeersWhoSharedParameters + 1 >= this.options.federationOptions.minPeers) {
+                            clearInterval(checkIfEnoughParametersShared)
+                            res(true)
+                        }
+                    }, this.options.federationOptions.waitTime)
+                })
 
                 await this.finalizeRound()
                 await new Promise(res => setTimeout(res, this.options.federationOptions.waitTime))
@@ -562,9 +586,9 @@ export class Decentifai {
      */
     checkTrainingStatus() {
         // For manual training mode
-        if (!this.autoTrainingEnabled && 1 + Object.keys(this.peers).length >= this.options.federationOptions.minPeers && 
+        if (!this.autoTrainingEnabled && 1 + Object.keys(this.peers).length >= this.options.federationOptions.minPeers &&
             !this.isTraining) {
-          return true
+            return true
         }
     }
 
@@ -649,7 +673,7 @@ export class Decentifai {
         if (roundData?.currentRound === this.trainingRound && ['proposed', 'training'].includes(roundData?.status)) {
             return true
         }
-        
+
         this.trainingRound++
 
         this.log(`Proposing training round ${this.trainingRound}`)
@@ -673,11 +697,12 @@ export class Decentifai {
         // Wait for acknowledgments before starting training
         const quorumReached = await new Promise((res, _) => {
             const checkForQuorum = setInterval(() => {
-            if(this._checkRoundAcknowledgments()) {
-                clearInterval(checkForQuorum)
-                res(true)
-            }
-        }, this.options.federationOptions.waitTime)})
+                if (this._checkRoundAcknowledgments()) {
+                    clearInterval(checkForQuorum)
+                    res(true)
+                }
+            }, this.options.federationOptions.waitTime)
+        })
         console.log(quorumReached)
         if (quorumReached) {
             this._dispatchEvent('roundQuorumReached', {
@@ -715,15 +740,15 @@ export class Decentifai {
      * Start a training round
      * @private
      */
-    
+
     async _startTrainingRound() {
         this.log(`Starting training round ${this.trainingRound}`)
-        
+
         this._dispatchEvent('roundStarted', { round: this.trainingRound })
 
         return await this._startLocalTrainingRound()
     }
-    
+
     /**
      * Start a training round
      * @returns {modelInfo} - Model metrics for the current training round
@@ -978,9 +1003,9 @@ export class Decentifai {
             const aggregatedParams = this.options.federationOptions.aggregateParametersFunc(peerParameters, this.options.backend)
 
             await this.model.updateLocalParametersFunc(this.model, aggregatedParams)
-        
+
             const currentRoundData = this.roundInfo.get('roundData')
-            if (currentRoundData.initiator === this.getSelfPeerId()) {   
+            if (currentRoundData.initiator === this.getSelfPeerId()) {
                 this.roundInfo.set('roundData', {
                     ...this.roundInfo.get('roundData'),
                     currentRound: this.trainingRound,
@@ -1108,7 +1133,7 @@ export class Decentifai {
             console.log('[Decentifai]', ...args)
         }
     }
-    
+
     /**
      * Log a message if debug is enabled
      * @private
