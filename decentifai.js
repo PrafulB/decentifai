@@ -266,7 +266,7 @@ export class Decentifai {
                     clientID,
                     connected: true,
                     lastSeen: Date.now(),
-                    metadata: state
+                    metadata: state.metadata
                 }
                 this._dispatchEvent('peersAdded', { peers: Object.keys(this.peers) })
                 this.log(`New peer ${state.metadata?.name} connected via awareness: ${clientID}`)
