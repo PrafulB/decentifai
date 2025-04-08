@@ -1,11 +1,19 @@
-import { Doc, WebrtcProvider, awarenessProtocol } from "https://prafulb.github.io/bundledYjs/dist/yjs-bundle.esm.js"
+// import { Doc, WebrtcProvider, awarenessProtocol } from "https://prafulb.github.io/bundledYjs/dist/yjs-bundle.esm.js"
+import { Doc } from "https://esm.sh/yjs"
+import { WebrtcProvider } from "http://localhost:5501/y-webrtc_y-webrtc.js"
 
-const DEFAULT_TURN_SERVER_FOR_ICE = {
-    urls: "turn:turn.speed.cloudflare.com:50000",
-    username:
-        "8b12fcfd4a40cc6fa9204b4ad0aaed9cd0e16d259cda6fe82ed832991c71090cc54d27b5581a0d5b2bbc3229a735adbc739b474858957ac53b4378cfb350eafd",
-    credential:
-        "aba9b169546eb6dcc7bfb1cdf34544cf95b5161d602e3b5fa7c8342b2e9802fb"
+const DEFAULTS = {
+    iceServers: [
+        {
+            urls: 'stun:stun.l.google.com:19302',
+            credsRequired: false
+        },
+        {
+            urls: "turn:turn.speed.cloudflare.com:50000",
+            credsRequired: true,
+            getCredsFrom: "https://speed.cloudflare.com/turn-creds"
+        }],
+    maxConns: 20
 }
 
 export class Decentifai {
@@ -15,29 +23,31 @@ export class Decentifai {
      * @param {string} options.roomId - Unique identifier for the federation
      * @param {string} options.backend - Framework backend for the model (only supports 'tfjs', 'onnx' and 'server', but 'onnx' support is not natively available yet)
      * @param {Object} options.model - The actual model in the case of TF.js; an object containing paths to the checkpoint state and the training, optimizer and evaluation models in the case of ONNX; or an object containing train, test, extractParameters and updateParameters functions.
-     * @param {Object} options.model.train - Function to train the model. Optional in case of a TF.js model where trainingData is supplied.
-     * @param {Object} options.model.test - Function to test the model.
+     * @param {Function} options.model.train - Function to train the model. Optional in case of a TF.js model where trainingData is supplied.
+     * @param {Function} options.model.test - Function to test the model.
      * @param {Function} options.model.extractLocalParametersFunc - Function to extract parameters from the model (default provided for TF.js models)
      * @param {Function} options.model.updateLocalParametersFunc - Function to update model with new parameters (default provided for TF.js models)
      * @param {Object|Array|Function} options.trainingData - Local training dataset, or a function that returns training data for a given round
      * @param {Object|Array|Function} options.testData - Local test dataset, or a function that returns test data
      * @param {Object} options.trainingOptions - Options to pass to the model during training
      * @param {Object} options.federationOptions - Options corresponding to how the federation should be conducted.
-     * @param {Object} options.federationOptions.aggregationMethod - Aggregation strategy to be used for parameter aggregation between rounds (optional, defaults to 'federatedAveraging').
+     * @param {String} options.federationOptions.password - Password that would be required to join the federation.
+     * @param {String} options.federationOptions.aggregationMethod - Aggregation strategy to be used for parameter aggregation between rounds (optional, defaults to 'federatedAveraging').
      * @param {Function} options.federationOptions.aggregateParametersFunc - Custom aggregation function to be used in place of aggregationMethod.
-     * @param {Function} options.federationOptions.minPeers - Minimum number of connected peers to reach quorum
-     * @param {Function} options.federationOptions.waitTime - Wait time (in milliseconds) between federation actions, in order to account for network asynchronicity between peers.
-     * @param {Function} options.federationOptions.minRounds - Minimum training rounds
-     * @param {Function} options.federationOptions.maxRounds - Maximum training rounds
-     * @param {Function} options.federationOptions.convergenceThresholds - Thresholds to check for model convergence.
-     * @param {Function} options.federationOptions.convergenceThresholds.parameterDistance - RMS distance of model parameters across stability window before convergence
-     * @param {Function} options.federationOptions.convergenceThresholds.lossDelta - Change in loss across stability window before convergence should be claimed
-     * @param {Function} options.federationOptions.convergenceThresholds.accuracyDelta - Change in accuracy across stability window before convergence can be claimed
-     * @param {Function} options.federationOptions.convergenceThresholds.stabilityWindow - Window size of consecutive rounds to check if convergence thresholds are met
+     * @param {Number} options.federationOptions.minPeers - Minimum number of connected peers to reach quorum
+     * @param {Number} options.federationOptions.maxPeers - Maximum number of connected peers to be allowed in the federation.
+     * @param {Number} options.federationOptions.minRounds - Minimum training rounds to run the federation for.
+     * @param {Number} options.federationOptions.maxRounds - Maximum training rounds to run the federation for.
+     * @param {Number} options.federationOptions.waitTime - Wait time (in milliseconds) between federation actions, in order to account for network asynchronicity between peers.
+     * @param {Object} options.federationOptions.convergenceThresholds - Thresholds to check for model convergence.
+     * @param {Number} options.federationOptions.convergenceThresholds.parameterDistance - RMS distance of model parameters across stability window before convergence
+     * @param {Number} options.federationOptions.convergenceThresholds.lossDelta - Change in loss across stability window before convergence should be claimed
+     * @param {Number} options.federationOptions.convergenceThresholds.accuracyDelta - Change in accuracy across stability window before convergence can be claimed
+     * @param {Number} options.federationOptions.convergenceThresholds.stabilityWindow - Window size of consecutive rounds to check if convergence thresholds are met
      * @param {boolean} options.autoTrain - Whether to automatically manage training rounds
      * @param {Array} options.signaling - Array of signaling server URLs
      * @param {Object} options.metadata - Additional metadata about this peer
-     * @param {boolean} options.forceTURNForICE - Forcibly use a TURN server for ICE candidate gathering. Fallback for if WebRTC connections cannot be established over the normal route (using STUN servers).
+     * @param {Array} options.iceServers - ICE servers to be used for WebRTC connections.
      * @param {boolean} options.debug - Enable debug logging
      */
     constructor(options) {
@@ -47,6 +57,7 @@ export class Decentifai {
             debug: false,
             backend: 'tfjs', // Default to tfjs
             autoTrain: false, // Do not start automatically by default
+            iceServers: [],
             ...options,
             metadata: {
                 ...options.metadata
@@ -58,14 +69,23 @@ export class Decentifai {
                 ...options.testOptions
             },
             federationOptions: {
+                password: "",
                 aggregationMethod: 'federatedAveraging',
                 minPeers: 2,
+                maxPeers: 5,
                 minRounds: 1,
                 maxRounds: 100,
                 waitTime: 2000,
-                ...options.federationOptions
+                ...options.federationOptions,
+                convergenceThresholds: {
+                    parameterDistance: 0.001,
+                    lossDelta: 0.01,
+                    accuracyDelta: 0.01,
+                    maxRounds: 50,
+                    stabilityWindow: 2,
+                    ...options.federationOptions?.convergenceThresholds
+                }
             },
-            forceTURNForICE: false
         }
 
         if (!this.options.model) {
@@ -123,31 +143,25 @@ export class Decentifai {
                 throw new Error('Aggregation Method or function implementation missing.')
             }
         }
-
-        this._initYDoc()
-        this._setupWebRTC()
-
         this.convergenceHistory = []
         this.convergenceMetrics = {
             parameterDistance: [],
             modelLoss: [],
             trainingAccuracy: []
         }
-        this.convergenceThresholds = {
-            parameterDistance: 0.001, // RMS distance of model parameters across stability window before convergence
-            lossDelta: 0.01, // Change in loss across stability window before convergence should be claimed
-            accuracyDelta: 0.01, // Change in accuracy across stability window before convergence can be claimed
-            maxRounds: 50, // Maximum training rounds
-            stabilityWindow: 2, // Number of consecutive rounds to check if convergence thresholds are met
-            ...this.options.federationOptions.convergenceThresholds
-        }
+        this.convergenceThresholds = this.options.federationOptions.convergenceThresholds
 
-        this.log('Federated Learning instance initialized with backend:', this.options.backend)
+        this._initYDoc()
+        this._setupWebRTC().then(() => {
+            this.log('Federated Learning instance initialized with backend:', this.options.backend)
 
-        if (this.autoTrainingEnabled) {
-            this._setupAutoTraining()
-            this.log('Auto-training mode enabled')
-        }
+            if (this.autoTrainingEnabled) {
+                this._setupAutoTraining()
+                this.log('Auto-training mode enabled')
+            }
+        })
+
+
     }
 
     /**
@@ -210,29 +224,35 @@ export class Decentifai {
      * @private
      */
 
-    _setupWebRTC() {
+    async _setupWebRTC() {
+        let iceServers = this.options.iceServers
+        if (iceServers.length === 0) {
+            for (const iceServer of DEFAULTS.iceServers) {
+                if (iceServer.credsRequired) {
+                    const { username, credential } = await (await fetch(iceServer.getCredsFrom)).json()
+                    iceServer.username = username
+                    iceServer.credential = credential
+                }
+                iceServers.push(iceServer)
+            }
+        }
+
         const webrtcProviderOptions = {
             signaling: this.options.signaling,
             password: this.options.password,
-            awareness: new awarenessProtocol.Awareness(this.ydoc),
-            maxConns: 20
-        }
-
-        if (this.options.forceTURNForICE) {
-            webrtcProviderOptions.peerOpts = {
-                config: [{
-                    urls: "turn:turn.speed.cloudflare.com:50000",
-                    username:
-                      "8b12fcfd4a40cc6fa9204b4ad0aaed9cd0e16d259cda6fe82ed832991c71090cc54d27b5581a0d5b2bbc3229a735adbc739b474858957ac53b4378cfb350eafd",
-                    credential:
-                      "aba9b169546eb6dcc7bfb1cdf34544cf95b5161d602e3b5fa7c8342b2e9802fb"
-                  }]
+            // awareness: new awarenessProtocol.Awareness(this.ydoc),
+            maxConns: DEFAULTS.maxConns,
+            peerOpts: {
+                config: {
+                    iceServers
+                }
             }
         }
-        
+
         this.provider = new WebrtcProvider(this.options.roomId, this.ydoc, webrtcProviderOptions)
 
         this.awareness = this.provider.awareness
+        console.log(this.awareness)
 
         // Set up awareness
         this.awareness.setLocalState({
