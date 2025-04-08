@@ -147,7 +147,7 @@ export class Decentifai {
      * @returns {Function} - Parameter extraction function
      */
     async _getDefaultExtractFunction(backend) {
-        const { extractLocalParameters } = await import('https://prafulb.github.io/Decentifai/utils/extractors.js')
+        const { extractLocalParameters } = await import('https://prafulb.github.io/decentifai/utils/extractors.js')
         return extractLocalParameters(backend)
     }
 
@@ -158,7 +158,7 @@ export class Decentifai {
      * @returns {Function} - Parameter update function
      */
     async _getDefaultUpdateFunction(backend) {
-        const { updateLocalParameters } = await import('https://prafulb.github.io/Decentifai/utils/updators.js')
+        const { updateLocalParameters } = await import('https://prafulb.github.io/decentifai/utils/updators.js')
         return updateLocalParameters(backend)
     }
 
@@ -168,7 +168,7 @@ export class Decentifai {
      * @returns {Function} - Parameter aggregation function
      */
     async _getAggregator(aggregationMethod) {
-        const aggregators = await import('https://prafulb.github.io/Decentifai/utils/aggregators.js')
+        const aggregators = await import('https://prafulb.github.io/decentifai/utils/aggregators.js')
         return aggregators[aggregationMethod]
     }
 
