@@ -1,8 +1,9 @@
 // import { Doc, WebrtcProvider, awarenessProtocol } from "https://prafulb.github.io/bundledYjs/dist/yjs-bundle.esm.js"
 import { Doc } from "https://esm.sh/yjs"
-import { WebrtcProvider } from "http://localhost:5501/y-webrtc_y-webrtc.js"
+import { WebrtcProvider } from "https://prafulb.github.io/bundledYjs/y-webrtc.js"
 
 const DEFAULTS = {
+    appBasePath: "https://prafulb.github.io/decentifai",
     iceServers: [
         {
             urls: 'stun:stun.l.google.com:19302',
@@ -171,7 +172,7 @@ export class Decentifai {
      * @returns {Function} - Parameter extraction function
      */
     async _getDefaultExtractFunction(backend) {
-        const { extractLocalParameters } = await import('https://prafulb.github.io/decentifai/utils/extractors.js')
+        const { extractLocalParameters } = await import(`${DEFAULTS.appBasePath}/utils/extractors.js`)
         return extractLocalParameters(backend)
     }
 
@@ -182,7 +183,7 @@ export class Decentifai {
      * @returns {Function} - Parameter update function
      */
     async _getDefaultUpdateFunction(backend) {
-        const { updateLocalParameters } = await import('https://prafulb.github.io/decentifai/utils/updators.js')
+        const { updateLocalParameters } = await import(`${DEFAULTS.appBasePath}/utils/updators.js`)
         return updateLocalParameters(backend)
     }
 
@@ -192,7 +193,7 @@ export class Decentifai {
      * @returns {Function} - Parameter aggregation function
      */
     async _getAggregator(aggregationMethod) {
-        const aggregators = await import('https://prafulb.github.io/decentifai/utils/aggregators.js')
+        const aggregators = await import(`${DEFAULTS.appBasePath}/utils/aggregators.js`)
         return aggregators[aggregationMethod]
     }
 
@@ -266,7 +267,7 @@ export class Decentifai {
 
         // Handle peer connections
 
-        this.awareness.on('change', (event) => {
+        this.provider.on('peers', (event) => {
             this._handlePeerUpdate(event)
         })
         this.awareness.on('update', (event) => {
@@ -302,7 +303,7 @@ export class Decentifai {
     _handlePeerUpdate(event) {
         const { added, updated, removed } = event
 
-        added.forEach(clientID => {
+        added?.forEach(clientID => {
             const state = this.awareness.getStates().get(clientID)
             if (state && state.online) {
                 this.peers[clientID] = {
@@ -311,12 +312,12 @@ export class Decentifai {
                     lastSeen: Date.now(),
                     metadata: state.metadata
                 }
+                this.log(`New peer ${state.metadata?.name} connected: ${clientID}`)
                 this._dispatchEvent('peersAdded', { peers: Object.keys(this.peers) })
-                this.log(`New peer ${state.metadata?.name} connected via awareness: ${clientID}`)
             }
         })
 
-        updated.forEach(clientID => {
+        updated?.forEach(clientID => {
             const state = this.awareness.getStates().get(clientID)
             if (state) {
                 const peer = this.peers[clientID]
@@ -326,11 +327,11 @@ export class Decentifai {
                     this.peers[clientID] = peer
                 }
                 this._dispatchEvent('peersChanged', { peers: Object.keys(this.peers) })
-                this.log(`Peer ${state.metadata?.name} updated via awareness.`)
+                // this.log(`Peer ${state.metadata?.name} updated via awareness.`)
             }
         })
 
-        removed.forEach(clientID => {
+        removed?.forEach(clientID => {
             if (!!this.peers[clientID]) {
                 const peer = this.peers[clientID]
                 this.log(`Peer ${peer.metadata?.name} disconnected via awareness: ${clientID}`)
