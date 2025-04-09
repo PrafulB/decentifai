@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Class: Decentifai</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Class: Decentifai</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        <h2><span class="attribs"><span class="type-signature"></span></span>Decentifai<span class="signature">(options)</span><span class="type-signature"></span></h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+
+    
+
+    
+    <h4 class="name" id="Decentifai"><span class="type-signature"></span>new Decentifai<span class="signature">(options)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Create a new Decentifai instance, a single entity to manage all P2P connections and learning.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Configuration options for Decentifai
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>roomId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Unique identifier for the federation</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>backend</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Framework backend for the model (only supports 'tfjs', 'onnx' and 'generic', but 'onnx' support is not natively available yet)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>model</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The actual model in the case of TF.js; an object containing paths to the checkpoint state and the training, optimizer and evaluation models in the case of ONNX; or an object containing train, test, extractParameters and updateParameters functions.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>train</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Function to train the model. Optional in case of a TF.js model where trainingData is supplied.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>test</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Function to test the model.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>extractLocalParametersFunc</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Function to extract parameters from the model (default provided for TF.js models)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>updateLocalParametersFunc</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Function to update model with new parameters (default provided for TF.js models)</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>trainingData</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+|
+
+<span class="param-type">Array</span>
+|
+
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Local training dataset, or a function that returns training data for a given round</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>testData</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+|
+
+<span class="param-type">Array</span>
+|
+
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Local test dataset, or a function that returns test data</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>trainingOptions</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Options to pass to the model during training</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>federationOptions</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Options corresponding to how the federation should be conducted.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>password</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Password that would be required to join the federation.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>aggregationMethod</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Aggregation strategy to be used for parameter aggregation between rounds (optional, defaults to 'federatedAveraging').</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>aggregateParametersFunc</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Custom aggregation function to be used in place of aggregationMethod.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>minPeers</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Minimum number of connected peers to reach quorum</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>maxPeers</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Maximum number of connected peers to be allowed in the federation.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>minRounds</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Minimum training rounds to run the federation for.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>maxRounds</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Maximum training rounds to run the federation for.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>waitTime</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Wait time (in milliseconds) between federation actions, in order to account for network asynchronicity between peers.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>convergenceThresholds</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Thresholds to check for model convergence.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>parameterDistance</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">RMS distance of model parameters across stability window before convergence</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>lossDelta</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Change in loss across stability window before convergence should be claimed</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>accuracyDelta</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Change in accuracy across stability window before convergence can be claimed</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>stabilityWindow</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Window size of consecutive rounds to check if convergence thresholds are met</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>autoTrain</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Whether to automatically manage training rounds</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>signaling</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Array of signaling server URLs</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>metadata</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Additional metadata about this peer</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>iceServers</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">ICE servers to be used for WebRTC connections.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>debug</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Enable debug logging</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="decentifai.js.html">decentifai.js</a>, <a href="decentifai.js.html#line74">line 74</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<h5>Fires:</h5>
+<ul>
+    <li>Decentifai#event:peersAdded - Fired when new peers connect to the federation</li>
+
+    <li>Decentifai#event:peersChanged - Fired when peer information is updated</li>
+
+    <li>Decentifai#event:peersRemoved - Fired when peers disconnect from the federation</li>
+
+    <li>Decentifai#event:parametersReceived - Fired when parameters are received from other peers</li>
+
+    <li>Decentifai#event:parametersShared - Fired when the local peer shares its parameters</li>
+
+    <li>Decentifai#event:parametersApplied - Fired when new parameters are applied to the local model</li>
+
+    <li>Decentifai#event:roundChanged - Fired when the current training round changes</li>
+
+    <li>Decentifai#event:roundProposed - Fired when a new training round is proposed</li>
+
+    <li>Decentifai#event:roundQuorumReached - Fired when enough peers have acknowledged a round proposal</li>
+
+    <li>Decentifai#event:roundStarted - Fired when a training round starts</li>
+
+    <li>Decentifai#event:localTrainingCompleted - Fired when local training completes for a round</li>
+
+    <li>Decentifai#event:roundFinalized - Fired when a training round is finalized and parameters are aggregated</li>
+
+    <li>Decentifai#event:autoTrainingStarted - Fired when automatic training begins</li>
+
+    <li>Decentifai#event:autoTrainingRoundCompleted - Fired when an automatic training round completes</li>
+
+    <li>Decentifai#event:autoTrainingStopped - Fired when automatic training stops</li>
+
+    <li>Decentifai#event:autoTrainingPaused - Fired when automatic training is paused</li>
+
+    <li>Decentifai#event:autoTrainingError - Fired when an error occurs during automatic training</li>
+
+    <li>Decentifai#event:modelConverged - Fired when the model has converged</li>
+
+    <li>Decentifai#event:disconnected - Fired when disconnecting from the federated learning network</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Decentifai_Decentifai.html">Decentifai</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.3</a> on Wed Apr 09 2025 09:40:29 GMT-0400 (Eastern Daylight Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
