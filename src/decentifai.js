@@ -22,7 +22,7 @@ export class Decentifai {
      * Create a new Decentifai instance, a single entity to manage all P2P connections and learning.
      * @param {Object} options - Configuration options for Decentifai
      * @param {string} options.roomId - Unique identifier for the federation
-     * @param {string} options.backend - Framework backend for the model (only supports 'tfjs', 'onnx' and 'server', but 'onnx' support is not natively available yet)
+     * @param {string} options.backend - Framework backend for the model (only supports 'tfjs', 'onnx' and 'generic', but 'onnx' support is not natively available yet)
      * @param {Object} options.model - The actual model in the case of TF.js; an object containing paths to the checkpoint state and the training, optimizer and evaluation models in the case of ONNX; or an object containing train, test, extractParameters and updateParameters functions.
      * @param {Function} options.model.train - Function to train the model. Optional in case of a TF.js model where trainingData is supplied.
      * @param {Function} options.model.test - Function to test the model.
@@ -50,6 +50,26 @@ export class Decentifai {
      * @param {Object} options.metadata - Additional metadata about this peer
      * @param {Array} options.iceServers - ICE servers to be used for WebRTC connections.
      * @param {boolean} options.debug - Enable debug logging
+     *
+     * @fires Decentifai#peersAdded - Fired when new peers connect to the federation
+     * @fires Decentifai#peersChanged - Fired when peer information is updated
+     * @fires Decentifai#peersRemoved - Fired when peers disconnect from the federation
+     * @fires Decentifai#parametersReceived - Fired when parameters are received from other peers
+     * @fires Decentifai#parametersShared - Fired when the local peer shares its parameters
+     * @fires Decentifai#parametersApplied - Fired when new parameters are applied to the local model
+     * @fires Decentifai#roundChanged - Fired when the current training round changes
+     * @fires Decentifai#roundProposed - Fired when a new training round is proposed
+     * @fires Decentifai#roundQuorumReached - Fired when enough peers have acknowledged a round proposal
+     * @fires Decentifai#roundStarted - Fired when a training round starts
+     * @fires Decentifai#localTrainingCompleted - Fired when local training completes for a round
+     * @fires Decentifai#roundFinalized - Fired when a training round is finalized and parameters are aggregated
+     * @fires Decentifai#autoTrainingStarted - Fired when automatic training begins
+     * @fires Decentifai#autoTrainingRoundCompleted - Fired when an automatic training round completes
+     * @fires Decentifai#autoTrainingStopped - Fired when automatic training stops
+     * @fires Decentifai#autoTrainingPaused - Fired when automatic training is paused
+     * @fires Decentifai#autoTrainingError - Fired when an error occurs during automatic training
+     * @fires Decentifai#modelConverged - Fired when the model has converged
+     * @fires Decentifai#disconnected - Fired when disconnecting from the federated learning network
      */
     constructor(options) {
         this.options = {
@@ -74,7 +94,7 @@ export class Decentifai {
                 aggregationMethod: 'federatedAveraging',
                 minPeers: 2,
                 maxPeers: 5,
-                minRounds: 1,
+                minRounds: 10,
                 maxRounds: 100,
                 waitTime: 2000,
                 ...options.federationOptions,
@@ -93,17 +113,17 @@ export class Decentifai {
             throw new Error('A model object must be provided.')
         }
 
-        if (!['tfjs', 'onnx', 'server'].includes(this.options.backend)) {
-            throw new Error('Backend must be one of "tfjs", "onnx" or "server"')
+        if (!['tfjs', 'onnx', 'generic'].includes(this.options.backend)) {
+            throw new Error('Backend must be one of "tfjs", "onnx" or "generic"')
         }
 
-        this.onDeviceTraining = this.options.backend !== 'server'
+        this.onDeviceTraining = this.options.backend !== 'generic'
 
         this.model = this.options.model
         // Set up default parameter functions based on backend
         if (!this.model.train || typeof (this.model.train) !== 'function') {
             if (!this.onDeviceTraining) {
-                throw new Error('Function to Train Model must be specified for server-side models.')
+                throw new Error('Function to Train Model must be specified for generic models.')
             }
             this._getDefaultModelTrainingFunction(this.options.backend).then(func => {
                 this.model.train = func
@@ -111,7 +131,7 @@ export class Decentifai {
         }
         if (!this.model.extractLocalParametersFunc || typeof (this.this.model.extractLocalParametersFunc) !== 'function') {
             if (!this.onDeviceTraining) {
-                throw new Error('Function to Extract Local Parameters must be specified for server-side models.')
+                throw new Error('Function to Extract Local Parameters must be specified for generic models.')
             }
             this._getDefaultExtractFunction(this.options.backend).then(func => {
                 this.model.extractLocalParametersFunc = func
@@ -120,7 +140,7 @@ export class Decentifai {
 
         if (!this.model.updateLocalParametersFunc || typeof (this.this.model.updateLocalParametersFunc) !== 'function') {
             if (!this.onDeviceTraining) {
-                throw new Error('Function to Update Local Parameters must be specified for server-side models.')
+                throw new Error('Function to Update Local Parameters must be specified for generic models.')
             }
             this._getDefaultUpdateFunction(this.options.backend).then(func => {
                 this.model.updateLocalParametersFunc = func
@@ -305,15 +325,19 @@ export class Decentifai {
 
         added?.forEach(clientID => {
             const state = this.awareness.getStates().get(clientID)
-            if (state && state.online) {
+            const peerExists = !!this.peers[clientID]
+
+            if (state?.online) {
                 this.peers[clientID] = {
                     clientID,
                     connected: true,
                     lastSeen: Date.now(),
                     metadata: state.metadata
                 }
-                this.log(`New peer ${state.metadata?.name} connected: ${clientID}`)
-                this._dispatchEvent('peersAdded', { peers: Object.keys(this.peers) })
+                if (!peerExists) {
+                    this.log(`New peer ${state?.metadata?.name} connected: ${clientID}`)
+                    this._dispatchEvent('peersAdded', { peers: Object.keys(this.peers) })
+                }
             }
         })
 
@@ -340,7 +364,6 @@ export class Decentifai {
             }
         })
 
-        this._checkTrainingStatus()
     }
 
     /**
@@ -391,7 +414,7 @@ export class Decentifai {
 
             if (roundData?.currentRound > this.trainingRound) {
                 if (roundData.status === 'proposed') {
-                    // Check if this peer is really behind in the federation. Forcibly update it to the latest aggregated parameter set if so.
+                    // Check if this peer is "really behind" in the federation. Forcibly update it to the latest aggregated parameter set if so.
                     if (this.trainingRound < roundData.currentRound - 1) {
                         const peerParameters = this.getParameters(roundData.currentRound - 1)
                         const aggregatedParams = this.options.federationOptions.aggregateParametersFunc(peerParameters, this.options.backend)
@@ -422,7 +445,7 @@ export class Decentifai {
         }
 
         // Listen for peer changes to potentially start training
-        this.on('peersChanged', () => {
+        this.on('peersAdded', () => {
             this._checkShouldStartTraining()
         })
 
@@ -437,11 +460,6 @@ export class Decentifai {
             this.isTraining = false
             this.log('Auto-training stopped: model converged')
         })
-
-        // Initial check after connection is established
-        setTimeout(() => {
-            this._checkShouldStartTraining()
-        }, 1000)
     }
 
     /**
@@ -467,7 +485,6 @@ export class Decentifai {
             return
         }
 
-        this.isTraining = true
         this.log('Starting auto-training process')
         this._dispatchEvent('autoTrainingStarted', {})
 
@@ -480,7 +497,7 @@ export class Decentifai {
      * @private
      */
     async _continueTrainingIfNeeded() {
-        if (!this.autoTrainingEnabled || !this.isTraining || this.converged) {
+        if (!this.autoTrainingEnabled || this.isTraining || this.converged) {
             return
         }
 
@@ -524,28 +541,44 @@ export class Decentifai {
             try {
                 this.log(`Auto-training round ${this.trainingRound + 1}`)
                 await new Promise(res => setTimeout(res, Math.random() * this.options.federationOptions.waitTime)) // Random wait to allow a proposer to initiate training and avoid multiple proposals happening simultaneously.
+
                 const proposalQuorumReached = await this.proposeTrainingRound()
                 await new Promise(res => setTimeout(res, this.options.federationOptions.waitTime))
                 if (proposalQuorumReached) {
                     await this.startTrainingRound()
+                } else {
+                    this.trainingRound--
+                    this.log(`Could not reach quorum for ${this.trainingRound + 1}. Retrying...`)
+                    return
                 }
-                await new Promise(res => {
+
+                let parameterSharingCountdown = 10
+                const enoughParametersShared = await new Promise(res => {
                     const checkIfEnoughParametersShared = setInterval(() => {
+                        parameterSharingCountdown--
                         const numPeersWhoSharedParameters = this.getNumPeersWhoSharedParameters()
-                        if (numPeersWhoSharedParameters + 1 >= this.options.federationOptions.minPeers) {
+                        if (numPeersWhoSharedParameters >= this.options.federationOptions.minPeers) {
                             clearInterval(checkIfEnoughParametersShared)
                             res(true)
+                        } else if (parameterSharingCountdown === 0) {
+                            clearInterval(checkIfEnoughParametersShared)
+                            res(false)
                         }
                     }, this.options.federationOptions.waitTime)
                 })
 
-                await this.finalizeRound()
-                await new Promise(res => setTimeout(res, this.options.federationOptions.waitTime))
+                if (enoughParametersShared) {
+                    await this.finalizeRound()
+                    await new Promise(res => setTimeout(res, this.options.federationOptions.waitTime))
 
-                this._dispatchEvent('autoTrainingRoundCompleted', {
-                    round: this.trainingRound,
-                    isConverged: this.converged
-                })
+                    this._dispatchEvent('autoTrainingRoundCompleted', {
+                        round: this.trainingRound,
+                        isConverged: this.converged
+                    })
+                } else {
+                    this.log(`Parameters missing from peers, could not reach quorum for aggregation. Moving on to the next round...`)
+                    return
+                }
 
             } catch (error) {
                 this.log('Error in auto-training round:', error)
@@ -714,17 +747,22 @@ export class Decentifai {
         this.awareness.setLocalState(awareness)
 
         this._dispatchEvent('roundProposed', { round: this.trainingRound })
-
+        let quorumCheckCountdown = 10 // PARAMETER!!! Should be defined by user ideally.
         // Wait for acknowledgments before starting training
         const quorumReached = await new Promise((res, _) => {
+
             const checkForQuorum = setInterval(() => {
+                quorumCheckCountdown--
                 if (this._checkRoundAcknowledgments()) {
                     clearInterval(checkForQuorum)
                     res(true)
+                } else if (quorumCheckCountdown === 0) {
+                    clearInterval(checkForQuorum)
+                    res(false)
                 }
             }, this.options.federationOptions.waitTime)
         })
-        console.log(quorumReached)
+
         if (quorumReached) {
             this._dispatchEvent('roundQuorumReached', {
                 round: this.trainingRound
@@ -1182,4 +1220,141 @@ export class Decentifai {
 
         this._dispatchEvent('disconnected', {})
     }
+    /**
+     * Peer added event.
+     * @event Decentifai#peersAdded
+     * @type {object}
+     * @property {string[]} peers - Array of connected peer IDs
+     */
+
+    /**
+     * Peer information changed event.
+     * @event Decentifai#peersChanged
+     * @type {object}
+     * @property {string[]} peers - Array of connected peer IDs
+     */
+
+    /**
+     * Peer removed event.
+     * @event Decentifai#peersRemoved
+     * @type {object}
+     * @property {string[]} peers - Array of remaining connected peer IDs
+     */
+
+    /**
+     * Parameters received event.
+     * @event Decentifai#parametersReceived
+     * @type {object}
+     * @property {object} parameters - Object containing received parameters
+     * @property {string} source - ID of the peer that sent the parameters
+     */
+
+    /**
+     * Parameters shared event.
+     * @event Decentifai#parametersShared
+     * @type {object}
+     * @property {object} parameters - Object containing the shared parameters
+     */
+
+    /**
+     * Parameters applied event.
+     * @event Decentifai#parametersApplied
+     * @type {object}
+     * @property {object} parameters - Object containing the parameters that were applied
+     */
+
+    /**
+     * Round changed event.
+     * @event Decentifai#roundChanged
+     * @type {object}
+     * @property {number} round - The new training round number
+     */
+
+    /**
+     * Round proposed event.
+     * @event Decentifai#roundProposed
+     * @type {object}
+     * @property {number} round - The proposed training round number
+     */
+
+    /**
+     * Round quorum reached event.
+     * @event Decentifai#roundQuorumReached
+     * @type {object}
+     * @property {number} round - The training round number that reached quorum
+     */
+
+    /**
+     * Round started event.
+     * @event Decentifai#roundStarted
+     * @type {object}
+     * @property {number} round - The training round number that started
+     */
+
+    /**
+     * Local training completed event.
+     * @event Decentifai#localTrainingCompleted
+     * @type {object}
+     * @property {number} round - The current training round number
+     * @property {boolean} isConverged - Boolean indicating if the model has converged
+     * @property {object} modelInfo - Object containing training metrics from the model
+     */
+
+    /**
+     * Round finalized event.
+     * @event Decentifai#roundFinalized
+     * @type {object}
+     * @property {number} round - The training round number that was finalized
+     * @property {number} participants - Number of peers that participated in the round
+     * @property {object} parameters - The aggregated parameters from all peers
+     */
+
+    /**
+     * Auto-training started event.
+     * @event Decentifai#autoTrainingStarted
+     * @type {object}
+     */
+
+    /**
+     * Auto-training round completed event.
+     * @event Decentifai#autoTrainingRoundCompleted
+     * @type {object}
+     * @property {number} round - The training round number that completed
+     * @property {boolean} isConverged - Boolean indicating if the model has converged
+     */
+
+    /**
+     * Auto-training stopped event.
+     * @event Decentifai#autoTrainingStopped
+     * @type {object}
+     * @property {string} reason - Reason why auto-training stopped (e.g., 'maxRoundsReached')
+     */
+
+    /**
+     * Auto-training paused event.
+     * @event Decentifai#autoTrainingPaused
+     * @type {object}
+     * @property {string} reason - Reason why auto-training was paused (e.g., 'insufficientPeers')
+     */
+
+    /**
+     * Auto-training error event.
+     * @event Decentifai#autoTrainingError
+     * @type {object}
+     * @property {string} error - Error message describing what went wrong
+     */
+
+    /**
+     * Model converged event.
+     * @event Decentifai#modelConverged
+     * @type {object}
+     * @property {number} round - The training round at which convergence was detected
+     * @property {object} convergenceMetrics - Object containing convergence metrics
+     */
+
+    /**
+     * Disconnected event.
+     * @event Decentifai#disconnected
+     * @type {object}
+     */
 }
