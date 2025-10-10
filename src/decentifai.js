@@ -229,9 +229,9 @@ export class Decentifai {
      */
     async _getDefaultModelTrainingFunction(backend) {
         // Example:
-        // if (backend === 'tfjs') {
-        //     const { trainTfjsModel } = await import(`${DEFAULTS.appBasePath}/utils/trainers.js`)
-        //     return trainTfjsModel
+        // if (backend === 'tfjs' || backend === 'onnx') {
+        //     const { trainModel } = await import(`${DEFAULTS.appBasePath}/utils/trainers.js`)
+        //     return trainModel(backend)
         // }
         this.log(`_getDefaultModelTrainingFunction called for ${backend}, but no default trainer is set up.`)
         return async () => { throw new Error(`Default training function for ${backend} not implemented.`) }
@@ -310,6 +310,7 @@ export class Decentifai {
         // Set up awareness
         this.awareness.setLocalState({
             clientID: this.ydoc.clientID,
+            name: this.metadata?.name,
             lastSeen: Date.now(),
             online: true,
             training: false,
@@ -403,10 +404,10 @@ export class Decentifai {
                 }
                 if (!peerExists) {
                     this.log(`New peer ${state.metadata?.name || state.clientID} connected.`)
-                    this._dispatchEvent('peersAdded', { peerId: state.clientID, peers: Object.keys(this.peers) })
+                    this._dispatchEvent('peersAdded', { peerId: state.clientID, name: state.metadata?.name, peers: Object.keys(this.peers) })
                 } else {
                     // this.log(`Peer ${state.metadata?.name || state.clientID} updated.`)
-                    this._dispatchEvent('peersChanged', { peerId: state.clientID, peers: Object.keys(this.peers) })
+                    this._dispatchEvent('peersChanged', { peerId: state.clientID, name: state.metadata?.name, peers: Object.keys(this.peers) })
                 }
             }
         })
@@ -464,7 +465,7 @@ export class Decentifai {
      * @private
      * @param {Object} event - Round update event
      */
-    _handleRoundUpdate(event) {
+    async _handleRoundUpdate(event) {
         // Ensure roundData is always fetched after an event, as it might have changed.
         const roundData = this.roundInfo.get('roundData')
 
@@ -483,6 +484,10 @@ export class Decentifai {
         // If the incoming round is ahead of the local round
         if (roundData.currentRound > this.trainingRound) {
             this.log(`Incoming round ${roundData.currentRound} is ahead of local round ${this.trainingRound}.`)
+
+            if (this.isTraining) {
+                await new Promise(res => this.on('roundFinalized', res, {once: true}))
+            }
 
             if (roundData.status === 'proposed') {
                 this.log(`Acknowledging proposal for round ${roundData.currentRound}.`)
@@ -782,7 +787,7 @@ export class Decentifai {
                     }
                 }
 
-                await new Promise(res => setTimeout(res, this.options.federationOptions.waitTime * 1.5)); // Wait for proposal to propagate and be acked
+                await new Promise(res => setTimeout(res, this.options.federationOptions.waitTime * 3)); // Wait for proposal to propagate and be acked
                 proposalQuorumReached = this._checkRoundAcknowledgments(this.trainingRound)
             }
 
@@ -1158,7 +1163,7 @@ export class Decentifai {
     }
 
     _calculateDistance(params1, params2) {
-        console.log(params1, params2)
+        // console.log(params1, params2)
         if (!params1 || !params2) return Infinity
 
         const p1Keys = Object.keys(params1)
@@ -1276,7 +1281,7 @@ export class Decentifai {
         }
 
         const currentParams = await this.model.extractLocalParametersFunc(this.model)
-        console.log(currentParams)
+        
         if (this.convergenceHistory.length > 0) {
             const previousHistoryEntry = this.convergenceHistory[this.convergenceHistory.length - 1]
             const previousParams = previousHistoryEntry.modelParameters
@@ -1541,8 +1546,8 @@ export class Decentifai {
      * @param {string} event - Event name
      * @param {Function} callback - Event callback
      */
-    on(event, callback) {
-        this.events.addEventListener(event, callback)
+    on(event, callback, options) {
+        this.events.addEventListener(event, callback, options)
     }
 
     /**
