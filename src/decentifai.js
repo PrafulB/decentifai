@@ -1,8 +1,9 @@
 // import { Doc, WebrtcProvider, awarenessProtocol } from "https://prafulb.github.io/bundledYjs/dist/yjs-bundle.esm.js"
 import { Doc } from "https://esm.sh/yjs"
-import { WebrtcProvider } from "https://prafulb.github.io/bundledYjs/y-webrtc.js"
 
 const DEFAULTS = {
+    // connectionType: "webrtc",
+    APP_ID: "Decentifai",
     appBasePath: "https://prafulb.github.io/decentifai",
     iceServers: [
         {
@@ -76,7 +77,9 @@ export class Decentifai {
      */
     constructor(options) {
         this.options = {
+            appId: DEFAULTS.APP_ID,
             roomId: 'Decentifai-test',
+            connectionType: 'webrtc',
             signaling: ['wss://signalyjs-df59a68bd6e6.herokuapp.com'],
             debug: false,
             backend: 'tfjs', // Default to tfjs
@@ -175,7 +178,7 @@ export class Decentifai {
         this.convergenceThresholds = this.options.federationOptions.convergenceThresholds
 
         this._initYDoc()
-        this._setupWebRTC().then(() => {
+        this._setupP2P().then(() => {
             this.log('Federated Learning instance initialized with backend:', this.options.backend)
 
             if (this.autoTrainingEnabled) {
@@ -260,49 +263,64 @@ export class Decentifai {
      * @private
      */
 
-    async _setupWebRTC() {
-        let iceServers = this.options.iceServers
-        if (iceServers.length === 0) {
-            for (const iceServer of DEFAULTS.iceServers) {
-                let processedIceServer = { ...iceServer }
-                if (processedIceServer.credsRequired) {
-                    try {
-                        const response = await fetch(processedIceServer.getCredsFrom)
-                        if (!response.ok) {
-                            throw new Error(`Failed to fetch TURN creds: ${response.statusText}`)
+    async _setupP2P() {
+        if (this.options.connectionType === 'webrtc') {
+            const { WebrtcProvider } = await import("https://prafulb.github.io/bundledYjs/y-webrtc.js")
+
+            let iceServers = this.options.iceServers
+            if (iceServers.length === 0) {
+                for (const iceServer of DEFAULTS.iceServers) {
+                    let processedIceServer = { ...iceServer }
+                    if (processedIceServer.credsRequired) {
+                        try {
+                            const response = await fetch(processedIceServer.getCredsFrom)
+                            if (!response.ok) {
+                                throw new Error(`Failed to fetch TURN creds: ${response.statusText}`)
+                            }
+                            const { username, credential } = await response.json()
+                            processedIceServer.username = username
+                            processedIceServer.credential = credential
+                            delete processedIceServer.getCredsFrom
+                            delete processedIceServer.credsRequired
+                        } catch (error) {
+                            this.warn(`Could not fetch credentials for TURN server ${processedIceServer.urls}. Error: ${error.message}`)
+                            continue
                         }
-                        const { username, credential } = await response.json()
-                        processedIceServer.username = username
-                        processedIceServer.credential = credential
-                        delete processedIceServer.getCredsFrom
-                        delete processedIceServer.credsRequired
-                    } catch (error) {
-                        this.warn(`Could not fetch credentials for TURN server ${processedIceServer.urls}. Error: ${error.message}`)
-                        continue
+                    }
+                    iceServers.push(processedIceServer)
+                }
+            }
+            const webrtcProviderOptions = {
+                signaling: this.options.signaling,
+                password: this.options.federationOptions?.password,
+                // awareness: new awarenessProtocol.Awareness(this.ydoc),
+                maxConns: this.options.federationOptions.maxPeers || DEFAULTS.maxConns,
+                filterBcConns: true,
+                peerOpts: {
+                    config: {
+                        iceServers
                     }
                 }
-                iceServers.push(processedIceServer)
             }
-        }
-
-        const webrtcProviderOptions = {
-            signaling: this.options.signaling,
-            password: this.options.federationOptions?.password,
-            // awareness: new awarenessProtocol.Awareness(this.ydoc),
-            maxConns: this.options.federationOptions.maxPeers || DEFAULTS.maxConns,
-            filterBcConns: true,
-            peerOpts: {
-                config: {
-                    iceServers
-                }
+            if(this.options.federationOptions.password){
+                webrtcProviderOptions.password = this.options.federationOptions.password
             }
+    
+            this.provider = new WebrtcProvider(this.options.roomId, this.ydoc, webrtcProviderOptions)
+
+        } else {
+            const { TrysteroProvider } = await import("https://esm.sh/@winstonfassett/y-webrtc-trystero")
+            const { joinRoom } = await import("https://esm.sh/trystero/nostr")
+
+            const trysteroRoom = joinRoom({ 
+                appId: this.options.appId || DEFAULTS.APP_ID,
+                password: this.options.federationOptions.password
+            }, this.options.roomId)
+            this.provider = new TrysteroProvider(this.options.roomId, this.ydoc, {
+                trysteroRoom,
+                maxConns: this.options.federationOptions.maxPeers || DEFAULTS.maxConns
+            })
         }
-        // if(this.options.federationOptions.password){
-        //     webrtcProviderOptions.password = this.options.federationOptions.password
-        // }
-
-
-        this.provider = new WebrtcProvider(this.options.roomId, this.ydoc, webrtcProviderOptions)
 
         this.awareness = this.provider.awareness
         // console.log(this.awareness)
@@ -418,7 +436,7 @@ export class Decentifai {
                 const peer = this.peers[existingPeerId]
                 this.log(`Peer ${peer.metadata?.name || existingPeerId} disconnected or went offline.`)
                 delete this.peers[existingPeerId]
-                this._dispatchEvent('peersRemoved', { peerId: parseInt(existingPeerId), peers: Object.keys(this.peers) })
+                this._dispatchEvent('peersRemoved', { peerId: parseInt(existingPeerId), name: peer.metadata?.name, peers: Object.keys(this.peers) })
             }
         })
     }
