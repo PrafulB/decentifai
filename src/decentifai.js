@@ -5,16 +5,11 @@ const DEFAULTS = {
     // connectionType: "webrtc",
     APP_ID: "Decentifai",
     appBasePath: "https://prafulb.github.io/decentifai",
-    iceServers: [
-        {
-            urls: 'stun:stun.l.google.com:19302',
-            credsRequired: false
-        },
-        {
-            urls: "turn:turn.speed.cloudflare.com:50000",
-            credsRequired: true,
-            getCredsFrom: "https://speed.cloudflare.com/turn-creds"
-        }],
+    iceServers: [{
+        urls: 'stun:stun.l.google.com:19302',
+        credsRequired: false
+    }],
+    turnCredsAPI: "https://noisy-math-e490.prtsh32.workers.dev/",
     maxConns: 20
 }
 
@@ -114,9 +109,9 @@ export class Decentifai {
             },
         }
 
-        if (!this.options.model) {
-            throw new Error('A model object must be provided.')
-        }
+        // if (!this.options.model) {
+        //     throw new Error('A model object must be provided.')
+        // }
 
         if (!['tfjs', 'onnx', 'generic'].includes(this.options.backend)) {
             throw new Error('Backend must be one of "tfjs", "onnx" or "generic"')
@@ -125,31 +120,8 @@ export class Decentifai {
         this.onDeviceTraining = this.options.backend !== 'generic'
 
         this.model = this.options.model
-        // Set up default parameter functions based on backend
-        if (!this.model.train || typeof (this.model.train) !== 'function') {
-            if (!this.onDeviceTraining) {
-                throw new Error('Function to Train Model must be specified for generic models.')
-            }
-            this._getDefaultModelTrainingFunction(this.options.backend).then(func => {
-                this.model.train = func
-            })
-        }
-        if (!this.model.extractLocalParametersFunc || typeof (this.model.extractLocalParametersFunc) !== 'function') {
-            if (!this.onDeviceTraining) {
-                throw new Error('Function to Extract Local Parameters must be specified for generic models.')
-            }
-            this._getDefaultExtractFunction(this.options.backend).then(func => {
-                this.model.extractLocalParametersFunc = func
-            })
-        }
-
-        if (!this.model.updateLocalParametersFunc || typeof (this.model.updateLocalParametersFunc) !== 'function') {
-            if (!this.onDeviceTraining) {
-                throw new Error('Function to Update Local Parameters must be specified for generic models.')
-            }
-            this._getDefaultUpdateFunction(this.options.backend).then(func => {
-                this.model.updateLocalParametersFunc = func
-            })
+        if (this.model) {
+            this._setupModel()
         }
 
         this.peers = {}
@@ -187,7 +159,40 @@ export class Decentifai {
             }
         })
 
+    }
 
+    /**
+     * Setup model training and parameter extraction methods for the model
+     * @private
+     */
+    _setupModel() {
+
+        // Set up default parameter functions based on backend
+        if (!this.model.train || typeof (this.model.train) !== 'function') {
+            if (!this.onDeviceTraining) {
+                throw new Error('Function to Train Model must be specified for generic models.')
+            }
+            this._getDefaultModelTrainingFunction(this.options.backend).then(func => {
+                this.model.train = func
+            })
+        }
+        if (!this.model.extractLocalParametersFunc || typeof (this.model.extractLocalParametersFunc) !== 'function') {
+            if (!this.onDeviceTraining) {
+                throw new Error('Function to Extract Local Parameters must be specified for generic models.')
+            }
+            this._getDefaultExtractFunction(this.options.backend).then(func => {
+                this.model.extractLocalParametersFunc = func
+            })
+        }
+
+        if (!this.model.updateLocalParametersFunc || typeof (this.model.updateLocalParametersFunc) !== 'function') {
+            if (!this.onDeviceTraining) {
+                throw new Error('Function to Update Local Parameters must be specified for generic models.')
+            }
+            this._getDefaultUpdateFunction(this.options.backend).then(func => {
+                this.model.updateLocalParametersFunc = func
+            })
+        }
     }
 
     /**
@@ -302,17 +307,17 @@ export class Decentifai {
                     }
                 }
             }
-            if(this.options.federationOptions.password){
+            if (this.options.federationOptions.password) {
                 webrtcProviderOptions.password = this.options.federationOptions.password
             }
-    
+
             this.provider = new WebrtcProvider(this.options.roomId, this.ydoc, webrtcProviderOptions)
 
         } else {
             const { TrysteroProvider } = await import("https://esm.sh/@winstonfassett/y-webrtc-trystero")
             const { joinRoom } = await import("https://esm.sh/trystero/nostr")
 
-            const trysteroRoom = joinRoom({ 
+            const trysteroRoom = joinRoom({
                 appId: this.options.appId || DEFAULTS.APP_ID,
                 password: this.options.federationOptions.password
             }, this.options.roomId)
@@ -359,6 +364,16 @@ export class Decentifai {
 
         this.log('WebRTC provider initialized with room:', this.options.roomId)
         this.log(`Self ID [${this.ydoc.clientID}] (${this.awareness.getLocalState()?.metadata?.name}) Available to connect with peers`)
+    }
+
+
+    /**
+     * Set/update a model for federation.
+     * @param {Object} model 
+     */
+    setModel(model) {
+        this.model = model
+        this._setupModel()
     }
 
     /**
@@ -504,7 +519,7 @@ export class Decentifai {
             this.log(`Incoming round ${roundData.currentRound} is ahead of local round ${this.trainingRound}.`)
 
             if (this.isTraining) {
-                await new Promise(res => this.on('roundFinalized', res, {once: true}))
+                await new Promise(res => this.on('roundFinalized', res, { once: true }))
             }
 
             if (roundData.status === 'proposed') {
@@ -680,9 +695,7 @@ export class Decentifai {
             this._dispatchEvent('autoTrainingError', { error: `Initial auto-training round failed: ${error.message}` })
         }
     }
-
-    as
-
+    
     /**
      * Continue training if the model hasn't converged.
      * @private
@@ -1299,7 +1312,7 @@ export class Decentifai {
         }
 
         const currentParams = await this.model.extractLocalParametersFunc(this.model)
-        
+
         if (this.convergenceHistory.length > 0) {
             const previousHistoryEntry = this.convergenceHistory[this.convergenceHistory.length - 1]
             const previousParams = previousHistoryEntry.modelParameters
@@ -1317,7 +1330,7 @@ export class Decentifai {
             if (Array.isArray(currentLoss)) {
                 currentLoss = currentLoss[0]
             }
-            
+
             if (typeof currentLoss === 'number') {
                 this.convergenceMetrics.modelLoss.push(currentLoss)
                 this.log(`Convergence metric: Current model loss = ${currentLoss.toFixed(5)}`)
@@ -1482,7 +1495,7 @@ export class Decentifai {
                     participantCount: numContributingPeers,
                     aggregatedParameters: aggregatedParams
                 })
-                
+
                 this.log(`Round ${this.trainingRound} status set to 'completed'.`)
 
             }
@@ -1642,7 +1655,7 @@ export class Decentifai {
      *  Clear all federation history locally (embeddings and parameter updates)
      */
     destroy() {
-         if (this.ydoc) {
+        if (this.ydoc) {
             this.ydoc.destroy()
             this.log('Y.js document destroyed.')
         }
